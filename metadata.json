@@ -1,0 +1,5 @@
+{
+  "name": "Bulk AI Image Optimizer",
+  "description": "Optimize multiple images at once. Upload images or a ZIP file, see them grouped by dimension, get AI-powered suggestions, and download all optimized images in a single ZIP file.",
+  "requestFramePermissions": []
+}
