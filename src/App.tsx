@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import type { OptimizationSettings, AiSuggestion, ImageFile, CompletionData } from './types';
 
-import { ImageUploader } from './components/ImageUploader';
-import { OptimizationForm } from './components/OptimizationForm';
-import { ImageGroupSummary } from './components/ImageGroupSummary';
-import { CompletionSummary } from './components/CompletionSummary';
+import { ImageUploader } from '../components/ImageUploader';
+import { OptimizationForm } from '../components/OptimizationForm';
+import { ImageGroupSummary } from '../components/ImageGroupSummary';
+import { CompletionSummary } from '../components/CompletionSummary';
 
 import { getOptimizationSuggestion } from './services/geminiService';
 import { useImageOptimizer } from './hooks/useImageOptimizer';
