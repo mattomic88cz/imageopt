@@ -7,7 +7,7 @@ import { ImageGroupSummary } from '../components/ImageGroupSummary';
 import { CompletionSummary } from '../components/CompletionSummary';
 
 import { getOptimizationSuggestion } from './services/geminiService';
-import { useImageOptimizer } from '../hooks/useImageOptimizer';
+import { useImageOptimizer } from "../hooks/useImageOptimizer";
 
 // Dichiarazione per informare TypeScript della presenza di JSZip dalla CDN
 declare var JSZip: any;
