@@ -31,10 +31,29 @@ const App: React.FC = () => {
 
   const { optimizeAndZip } = useImageOptimizer();
 
+  const groupedImages = useMemo(() => groupImagesByDimensions(imageFiles), [imageFiles]);
+  const totalOriginalSize = useMemo(() => calculateTotalSize(imageFiles), [imageFiles]);
+
+  const processFiles = useCallback(async (fileList: FileList) => {
+    return await processUploadedFiles(fileList);
+  }, []);
+
+  const handleGetAiSuggestion = useCallback(async () => {
+    setAppState('optimizing_ai');
+    try {
+      const suggestion = await getOptimizationSuggestion(imageFiles);
+      setAiSuggestion(suggestion);
+      setAppState('summary');
+    } catch (error) {
+      console.error('AI suggestion failed:', error);
+      alert(`Failed to get AI suggestion: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAppState('summary');
+    }
+  }, [imageFiles]);
+
   const handleFileProcessing = useCallback(async (fileList: FileList) => {
     setAppState('processing');
-
-  const handleOptimize = useCallback(async () => {
+    try {
       const processedImages = await processFiles(fileList);
       setImageFiles(processedImages);
       setAppState('summary');
@@ -42,6 +61,16 @@ const App: React.FC = () => {
       console.error('File processing failed:', error);
       alert(`An error occurred while processing files: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setAppState('upload');
+    }
+  }, [processFiles]);
+
+  const handleOptimize = useCallback(async () => {
+    setAppState('optimizing');
+    try {
+      const result = await optimizeAndZip(imageFiles, settings);
+      if (result) {
+        setCompletionData({
+          originalSize: totalOriginalSize,
           finalSize: result.finalSize,
           fileCount: imageFiles.length,
         });
