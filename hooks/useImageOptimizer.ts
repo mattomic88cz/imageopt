@@ -1,74 +1,116 @@
 import { useCallback } from 'react';
-import type { OptimizationSettings, ImageFile } from '../types';
+import type { OptimizationSettings, ImageFile, OptimizationResult } from '../src/types';
+import { 
+  calculateOptimalDimensions, 
+  createOptimizedCanvas, 
+  loadImageFromFile,
+  generateOptimizedFileName,
+  createProcessingError
+} from '../src/utils/imageUtils';
 
-// Dichiarazione per informare TypeScript della presenza di JSZip dalla CDN
+// Declare JSZip for TypeScript
 declare var JSZip: any;
 
 export const useImageOptimizer = () => {
-
-  const optimizeAndZip = useCallback(async (
-    files: ImageFile[],
+  /**
+   * Optimizes a single image file
+   */
+  const optimizeSingleImage = useCallback(async (
+    imageFile: ImageFile,
     settings: OptimizationSettings
-  ): Promise<{ blob: Blob; finalSize: number } | null> => {
-    if (!files.length) return null;
-
-    const zip = new JSZip();
-
-    const optimizationPromises = files.map(imageFile => {
-      return new Promise<void>((resolve, reject) => {
-        const image = new Image();
-        image.src = imageFile.objectUrl;
-
-        image.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return reject(new Error('Canvas context not available'));
-
-          let { width, height } = image;
-          const { maxWidth, quality, format } = settings;
-
-          if (width > maxWidth) {
-            const ratio = maxWidth / width;
-            width = maxWidth;
-            height = height * ratio;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          ctx.drawImage(image, 0, 0, width, height);
-
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                const originalName = imageFile.name.substring(0, imageFile.name.lastIndexOf('.'));
-                const newFileName = `${originalName}-optimized.${format}`;
-                zip.file(newFileName, blob);
-                resolve();
-              } else {
-                reject(new Error(`Failed to create blob for ${imageFile.name}`));
-              }
-            },
-            `image/${format}`,
-            quality
-          );
-        };
-        image.onerror = () => reject(new Error(`Failed to load image ${imageFile.name}`));
-      });
-    });
-
+  ): Promise<{ name: string; blob: Blob }> => {
     try {
-      await Promise.all(optimizationPromises);
-
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const image = await loadImageFromFile(imageFile.file);
+      const { quality, maxWidth, format } = settings;
       
-      return { blob: zipBlob, finalSize: zipBlob.size };
-
+      // Calculate optimal dimensions
+      const dimensions = calculateOptimalDimensions(image.width, image.height, maxWidth);
+      
+      // Create optimized canvas
+      const canvas = createOptimizedCanvas(image, dimensions);
+      
+      // Convert to blob with specified format and quality
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const fileName = generateOptimizedFileName(imageFile.name, format);
+              resolve({ name: fileName, blob });
+            } else {
+              reject(createProcessingError(
+                'Failed to create optimized blob', 
+                imageFile.name, 
+                'compression'
+              ));
+            }
+          },
+          `image/${format}`,
+          quality
+        );
+      });
     } catch (error) {
-      console.error("Error during image optimization and zipping:", error);
-      // Re-throw the error to be caught by the calling function
-      throw error;
+      throw createProcessingError(
+        `Optimization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        imageFile.name,
+        'optimization'
+      );
     }
   }, []);
 
-  return { optimizeAndZip };
+  /**
+   * Optimizes multiple images and creates a ZIP file
+   */
+  const optimizeAndZip = useCallback(async (
+    files: ImageFile[],
+    settings: OptimizationSettings
+  ): Promise<OptimizationResult | null> => {
+    if (!files.length) return null;
+
+    try {
+      const zip = new JSZip();
+      
+      // Process images in batches to avoid memory issues
+      const BATCH_SIZE = 5;
+      const batches = [];
+      
+      for (let i = 0; i < files.length; i += BATCH_SIZE) {
+        batches.push(files.slice(i, i + BATCH_SIZE));
+      }
+      
+      // Process each batch sequentially
+      for (const batch of batches) {
+        const batchPromises = batch.map(imageFile => 
+          optimizeSingleImage(imageFile, settings)
+        );
+        
+        const batchResults = await Promise.all(batchPromises);
+        
+        // Add results to ZIP
+        batchResults.forEach(({ name, blob }) => {
+          zip.file(name, blob);
+        });
+      }
+
+      // Generate ZIP file
+      const zipBlob = await zip.generateAsync({ 
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      });
+      
+      return { 
+        blob: zipBlob, 
+        finalSize: zipBlob.size 
+      };
+
+    } catch (error) {
+      console.error('Batch optimization failed:', error);
+      throw error;
+    }
+  }, [optimizeSingleImage]);
+
+  return { 
+    optimizeAndZip,
+    optimizeSingleImage 
+  };
 };
