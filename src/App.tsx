@@ -33,61 +33,15 @@ const App: React.FC = () => {
 
   const handleFileProcessing = useCallback(async (fileList: FileList) => {
     setAppState('processing');
-    
-    try {
-      const processedImages = await processUploadedFiles(fileList);
+
+  const handleOptimize = useCallback(async () => {
+      const processedImages = await processFiles(fileList);
       setImageFiles(processedImages);
       setAppState('summary');
     } catch (error) {
       console.error('File processing failed:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      alert(`Failed to process files: ${errorMessage}`);
+      alert(`An error occurred while processing files: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setAppState('upload');
-    }
-  }, []);
-  
-  const groupedImages = useMemo(() => {
-    return groupImagesByDimensions(imageFiles);
-  }, [imageFiles]);
-
-  const totalOriginalSize = useMemo(() => {
-    return calculateTotalSize(imageFiles);
-  }, [imageFiles]);
-  
-  const handleGetAiSuggestion = useCallback(async () => {
-    if (imageFiles.length === 0) return;
-    
-    const representativeImage = imageFiles[0].file;
-    setAppState('optimizing_ai');
-    setAiSuggestion(null);
-
-    try {
-      const suggestion = await getOptimizationSuggestion(representativeImage);
-      if (suggestion) {
-        setSettings(prev => ({
-          ...prev,
-          format: suggestion.format,
-          quality: suggestion.quality,
-          maxWidth: suggestion.maxWidth,
-        }));
-        setAiSuggestion(suggestion);
-      }
-    } catch (error) {
-      console.error("Failed to get AI suggestion:", error);
-      alert("Could not get AI suggestion. Please try again.");
-    } finally {
-      setAppState('summary');
-    }
-  }, [imageFiles]);
-
-  const handleOptimize = useCallback(async () => {
-    setAppState('optimizing');
-    try {
-      const result = await optimizeAndZip(imageFiles, settings);
-      if (result) {
-        setCompletionData({
-          blob: result.blob,
-          initialSize: totalOriginalSize,
           finalSize: result.finalSize,
           fileCount: imageFiles.length,
         });
